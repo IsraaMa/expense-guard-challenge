@@ -68,6 +68,42 @@ already handled for you; you shouldn't need to touch it.
 - Be mindful of cost. Model choice and prompt structure have real, large cost implications in
   production agent systems — treat them as a design constraint, not an afterthought.
 
+## AI judgment — written section
+
+Beyond fixing the code, we want your judgment on **when an agent is the right tool at all**.
+Answer in a `BOUNDARIES.md` at the repo root, in two parts. Short, concrete answers beat general
+essays — bullet points are fine.
+
+### Part A — Boundaries of this agent
+
+1. **Model vs. code.** Which responsibilities currently handled by (or exposed to) the LLM in
+   Expense Guard should be deterministic code instead, and why? Which genuinely need a model?
+2. **Guarantees.** What can this agent never guarantee, no matter how good the prompt is? For
+   each item: where must that guarantee be enforced instead?
+3. **Failure containment.** When the model gets it wrong anyway — hallucinated rule, wrong
+   decision — what should the surrounding system do so that a wrong LLM output cannot become a
+   wrong business outcome?
+
+### Part B — Build the right thing
+
+For each scenario below, recommend the **shape** of the solution — no AI at all, deterministic
+automation, a single LLM call, retrieval + LLM, or a full tool-using agent — and justify it in
+2-4 bullets. Also state **what would change your mind** (the condition under which you'd pick a
+different shape). There is no trick: some of these should not be agents, and recommending an
+agent everywhere is a wrong answer.
+
+1. **Invoice reconciliation.** Every night, compare the payment provider's invoices against the
+   internal billing records and alert the team about mismatches.
+2. **Message intent tagging.** Tag every inbound customer WhatsApp message (~500k/day) with an
+   intent label (`pricing_question`, `support_request`, `purchase_intent`, ...) to drive routing
+   and analytics.
+3. **Policy Q&A for finance teams.** Let a company's employees ask free-form questions about
+   their own expense policy ("can I expense a hotel upgrade?") and get an answer grounded in the
+   policy text.
+4. **Autonomous expense appeals.** When an expense is rejected, let the submitter dispute it;
+   the system re-examines the receipt, may request missing documents from the submitter, checks
+   the policy, and either reverses the decision or escalates to a human with a recommendation.
+
 ## Deliverables
 
 1. **A PR or diff** against this repo with your changes.
@@ -75,15 +111,17 @@ already handled for you; you shouldn't need to touch it.
    confirmed it was real, what you changed, and why. Also list anything you noticed but
    deliberately chose *not* to fix, and why you deprioritized it. We want your reasoning, not a
    changelog.
-3. **Your coding-assistant session export**, zipped, as a JSONL (or your tool's native export
+3. **`BOUNDARIES.md`** — your answers to the AI-judgment section above (Parts A and B).
+4. **Your coding-assistant session export**, zipped, as a JSONL (or your tool's native export
    format if JSONL isn't available). We want to see your actual working process — prompts,
    iterations, dead ends included.
 
 ## Time box
 
-Plan for about **3 hours**, worked async on your own time. Afterward, we'll do a **~1 hour live
-session** together to walk through your diagnosis, your evals, and your decisions — including
-questions on parts of the system you may not have touched.
+Plan for about **3 hours**, worked async on your own time — leave roughly 30-40 minutes of that
+for `BOUNDARIES.md`. Afterward, we'll do a **~1 hour live session** together to walk through your
+diagnosis, your evals, your AI-judgment answers, and your decisions — including questions on
+parts of the system you may not have touched.
 
 There's no bonus for speed and no penalty for using the full time thoughtfully. If 3 hours run out
 before you're done, ship what you have and be upfront in `FINDINGS.md` about what's left and why
