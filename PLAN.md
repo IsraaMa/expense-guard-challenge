@@ -117,6 +117,16 @@ Commit: "P3-10: final code-noise sweep". Per-file cleanups happened inside their
 the final sweep converted `policies.ts` to object literals and corrected a stale
 cache-savings comment in `review.ts`. Greps came back clean otherwise.
 
+### P1-7 — Topic narrowing hid company-wide rules — ✅ DONE (found by new coverage evals)
+
+Commit: "P1-7: a cash-paid lunch can no longer slip past the cash-receipt rule".
+`evals/policy-coverage.eval.ts` (dataset fan-out, 6 deterministic single-turn cases) gave
+every untested policy rule an executable spec and immediately caught this: `search_policy`'s
+topic narrowing filtered out category-"general" rules, so a cash-paid lunch was approved
+without the model ever seeing CASH-01. `selectRules` now always includes "general" rules;
+unit-tested. Eval suite serialized (`maxConcurrency: 1`) after a concurrency-induced
+transport flake.
+
 ### FINAL — Deliverables pass — ✅ DONE
 
 1. FINDINGS.md review: every commit has an entry; add the "deliberately not fixed" section
@@ -131,3 +141,32 @@ cache-savings comment in `review.ts`. Greps came back clean otherwise.
 3. Squash nothing; the ordered commit history is part of the deliverable. Final
    `git push`, then prepare the PR `IsraaMa:fixes` → upstream (or hand over the diff), and
    export the assistant session as the third deliverable.
+
+## Known limitations of this approach
+
+Read before extending the project — these are the boundaries of what the work above proves.
+
+1. **Single-run, phrasing-sensitive evals.** Each eval samples the model once and several
+   gates match natural language (rule ids, limit phrases) — we fixed two false positives in
+   our own assertions, and the inverse (wording drift failing CI) remains possible. Robust
+   next step: multiple trials per case, and a structured `cited_rule_id` output field so
+   assertions stop parsing prose.
+2. **Coverage is per-rule, not combinatorial.** After P1-7 every policy rule has one
+   executable spec, but rule *interactions* (e.g. an over-limit meal that is also
+   cash-paid), multi-currency claims, and adversarial OCR variants are unexplored. The
+   dataset fan-out pattern in `policy-coverage.eval.ts` is the cheap place to add rows.
+3. **Injection resistance is layered, not absolute.** The strongest defense is structural
+   (tools cannot be steered to another tenant), but the decision still rests on the model
+   honoring the `<receipt_ocr>` trust boundary; there is no runtime output filter beyond
+   PAN redaction at source. Redaction is regex-based (no Luhn) and would miss a card number
+   split across OCR lines.
+4. **Exploit proven by construction, not observation.** For P0-3 the pre-fix model already
+   resisted the sample injection; we demonstrated the vector, not a successful end-to-end
+   exploit.
+5. **Cost/caching conclusions are point-in-time.** The P2-8 measurements are specific to
+   eve 0.11.7's message-tail cache breakpoint; re-measure after any eve upgrade.
+6. **The eval suite needs a live, paid model API.** Unit tests carry the deterministic
+   load offline; the evals cannot gate every push for free, and they run serialized
+   (`maxConcurrency: 1`) because the dev worker is unreliable under parallel turns.
+7. **Known semantic gaps are deferred, not solved** — endpoint auth, currency validation,
+   attendee count as a real field (see FINDINGS.md "Noticed but deliberately not fixed").

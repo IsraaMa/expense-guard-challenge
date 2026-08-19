@@ -269,6 +269,38 @@ verified by the policy-store tests — and a comment in `review.ts` claiming cro
 cache savings that P2-8's measurements disproved, now pointing at the honest FINDINGS
 numbers instead. Full checklist after: 6/6 evals, 12/12 gates, 14 unit tests.
 
+## P1-7 — Topic narrowing hid company-wide rules; caught by new full-rule eval coverage
+
+**What we found.** Closing the "example-based coverage" limitation, we added
+`evals/policy-coverage.eval.ts` — a dataset fan-out (one file, six inline cases, ids
+`policy-coverage/0000`–`0005`) giving every previously-untested policy rule (ALC-01,
+CASH-01, ENT-01, globex MEAL-01, TRVL-01, OFF-01) one executable spec. Efficiency was a
+design constraint: each case is a single review turn with purely deterministic gates
+(allowed decision set + rule id in `cited_rule`), no judge tokens; amounts are chosen so
+exactly one rule decides each case; and where a rule's own wording leaves the over-limit
+outcome open ("capped at $35"), the case accepts any non-approval instead of pinning one
+reading.
+
+On its very first run the suite caught a real bug: a **$20 cash-paid lunch was approved**
+citing MEAL-01, with no mention of Initech's CASH-01 ("cash-only receipts are not
+reimbursable — reject"). Root cause in `policy-store.ts`: `search_policy`'s topic narrowing
+(the model reasonably asks for topic "meals") returned only rules matching the topic —
+cross-cutting rules filed under category "general" (CASH-01, GEN-01) were filtered out, so
+the model decided without ever seeing the hard rule it was breaking.
+
+**What we changed and why.** `selectRules` now always appends the company's
+"general"-category rules to any narrowed result — narrowing exists to reduce noise, and
+must never hide rules that apply to every expense. Also serialized the eval suite
+(`maxConcurrency: 1`): at concurrency 2 the single dev worker occasionally dropped a
+request mid-eval, aborting a test with its remaining gates unrecorded (observed once on
+tenant-isolation, which passes solo). Slower wall clock, deterministic results.
+
+**Proof it holds.** New unit test: a "meals"-topic Initech lookup must contain MEAL-01,
+CASH-01, and GEN-01 but not OFF-01 (fails against the old `selectRules`). End-to-end, the
+cash-only case now rejects citing CASH-01. Full suite: 12/12 evals, 18/18 gates, 15 unit
+tests. This is the eval-diversity payoff in miniature: one afternoon-priced dataset eval
+found a policy-retrieval defect all the targeted evals had missed.
+
 ## Baseline (Step 1) — what we actually observed before fixing anything
 
 All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.

@@ -8,6 +8,9 @@ export default defineEvalConfig({
   judge: {
     model: "anthropic/claude-haiku-4.5",
   },
-  maxConcurrency: 2,
+  // Serialized: the single dev worker is not reliable under parallel review turns — at
+  // concurrency 2 an occasional transport error aborts an eval mid-test (observed as a
+  // tenant-isolation failure with its remaining gates unrecorded).
+  maxConcurrency: 1,
   timeoutMs: 120_000,
 });

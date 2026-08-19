@@ -25,6 +25,16 @@ describe("searchPolicy", () => {
     expect(() => searchPolicy("no-such-company", undefined)).toThrow(/no-such-company/);
   });
 
+  test("topic narrowing never hides cross-cutting 'general' rules", () => {
+    // Regression: a meals-topic lookup omitted Initech's CASH-01 (category "general"),
+    // and a cash-paid lunch was approved against MEAL-01 alone.
+    const narrowed = searchPolicy("initech", "meals").rules;
+    expect(narrowed).toContain("MEAL-01");
+    expect(narrowed).toContain("CASH-01");
+    expect(narrowed).toContain("GEN-01");
+    expect(narrowed).not.toContain("OFF-01");
+  });
+
   test("narrows to the matching rules, and returns the full policy when nothing matches", () => {
     const alcohol = searchPolicy("acme", "alcohol").rules;
     expect(alcohol).toContain("ALC-01");

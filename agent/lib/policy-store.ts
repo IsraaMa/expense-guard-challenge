@@ -17,7 +17,10 @@ function getCompanyPolicy(companyId: string): tCompanyPolicy {
 }
 
 // Rules whose category or text mentions the topic; falls back to the full policy so the
-// model never has to decide from an empty rule set.
+// model never has to decide from an empty rule set. Rules in the "general" category apply
+// to every expense regardless of topic (e.g. Initech's cash-only and over-$100 rules), so
+// narrowing must never hide them — a meals-topic lookup that omitted CASH-01 caused a
+// cash-paid lunch to be approved.
 function selectRules(policy: tCompanyPolicy, topic: string | undefined): tPolicyRule[] {
   if (!topic) return policy.rules;
   const needle = topic.toLowerCase();
@@ -25,7 +28,11 @@ function selectRules(policy: tCompanyPolicy, topic: string | undefined): tPolicy
     (rule) =>
       rule.category.toLowerCase().includes(needle) || rule.text.toLowerCase().includes(needle),
   );
-  return hits.length > 0 ? hits : policy.rules;
+  if (hits.length === 0) return policy.rules;
+  const crossCutting = policy.rules.filter(
+    (rule) => rule.category === "general" && !hits.includes(rule),
+  );
+  return [...hits, ...crossCutting];
 }
 
 function formatRules(rules: tPolicyRule[]): string {
