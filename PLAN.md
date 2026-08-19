@@ -31,6 +31,15 @@ code and the ordered plan to fix them.
    proposed replacement is `anthropic/claude-sonnet-4.5` for the agent and
    `anthropic/claude-haiku-4.5` for the judge.
 
+1. **The eval suite cannot run at all** — `agent/channels/eve.ts` (found during baseline)
+   `eve eval` drives the agent through the framework's default `POST /eve/v1/session` route.
+   The custom channel *replaces* eve's default channel and only registers
+   `POST /eve/v1/review`, so every eval fails instantly with a 404 before any model call
+   (`Results: 2 failed (2 total)` in 128ms). The same missing route breaks the `eve dev`
+   playground. "Evals as executable specs" are dead as shipped; fix by restoring the default
+   session routes alongside the custom review route (e.g. rename the authored channel so it
+   doesn't shadow the built-in `eve` channel, or mount the default routes explicitly).
+
 ### P0 — Tenant isolation (security)
 
 1. **Policy memoization leaks across tenants** — `agent/lib/policy-store.ts:5-13`
@@ -49,13 +58,15 @@ code and the ordered plan to fix them.
 
 ### P1 — Correctness
 
-4. **Reference eval asserts the wrong outcome** — `evals/approve-valid.eval.ts`
-   It expects `approve` on the default fixture (`fixtures/request.json` = acme, software,
-   **$450/month**), but acme rule SW-01 says >$200/month → `flag_for_review`. Either the
-   assertion or the fixture is wrong (`fixtures/valid.json` is the within-policy meal the eval
-   describes).
-5. **`cross-company.json` is a duplicate** — byte-identical to `valid.json`; tests nothing
-   cross-company.
+4. ~~Reference eval asserts the wrong outcome~~ — **RETRACTED during baseline.** The original
+   read of the fixtures attributed the wrong contents to the wrong files (a `cat fixtures/*`
+   in alphabetical order, misread). `fixtures/request.json` is actually the within-policy
+   acme $96 meal, so `approve-valid.eval.ts` asserts the right outcome. Kept here for honest
+   traceability.
+5. **`request.json` and `valid.json` are byte-identical duplicates** (corrected from the
+   earlier claim about `cross-company.json`, which is in fact a real initech fixture and a
+   working cross-tenant probe). Two identical fixtures under different names invite exactly
+   the misattribution above; deduplicate or differentiate.
 6. **`validate_expense` validates nothing useful** — only checks field presence, which the
    input schema already guarantees. It never checks line-item sums vs the claimed amount,
    though the system prompt tells the model to verify totals.
@@ -90,9 +101,9 @@ code and the ordered plan to fix them.
 2. **Fix tenant isolation** — remove the memoization; throw on unknown `company_id`; make the
    tools read `company_id` from `submissionState` and drop it from tool input schemas so the
    model can't spoof it.
-3. **Fix the broken eval + fixtures** — align `approve-valid` with a genuinely within-policy
-   fixture; make `cross-company.json` a real cross-tenant case; add a flag-for-review
-   expectation for `request.json`.
+3. **Restore the eval harness + tidy fixtures** — bring back the default `/eve/v1/session`
+   routes so `eve eval` (and the dev playground) work again (BLOCKER-1); deduplicate
+   `request.json` / `valid.json`.
 4. **Make `validate_expense` real** — read the submission from state; check line-item sum vs
    claimed amount; surface mismatch/illegibility.
 5. **Cost** — switch the model to Sonnet; reorder the prompt static-first for caching; verify

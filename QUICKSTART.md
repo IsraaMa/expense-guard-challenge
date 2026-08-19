@@ -63,11 +63,11 @@ Fixtures (`fixtures/*.json`):
 
 | Fixture | Contents | What the policy actually says |
 |---|---|---|
-| `request.json` (default) | acme, software, **$450/month** SaaS | SW-01: > $200/mo → should be **flag_for_review** |
-| `valid.json` | acme, meals, $96 for 2 people ($48/attendee) | MEAL-01: ≤ $50/attendee → should be **approve** |
-| `ambiguous.json` | initech, meals, $40 | MEAL-01 ($25/attendee, attendees unknown) and GEN-01 (> $100? no) — genuinely ambiguous → likely **flag_for_review** |
+| `request.json` (default) | acme, meals, $96 for 2 people ($48/attendee) | MEAL-01: ≤ $50/attendee → should be **approve** |
+| `valid.json` | ⚠️ Byte-identical copy of `request.json` | same as above |
+| `ambiguous.json` | acme, software, **$450/month** SaaS | SW-01: > $200/mo → should be **flag_for_review** |
+| `cross-company.json` | initech, meals, $40 (Burgers x2 → ~2 attendees, $20 each) | initech MEAL-01: ≤ $25/attendee → **approve**, but MUST cite initech's rule — this is the cross-tenant probe |
 | `illegible.json` | globex, travel, $1,280 claimed but receipt totals are smudged; line items only show $45 | Unverifiable amount → should be **flag_for_review** |
-| `cross-company.json` | ⚠️ Byte-identical copy of `valid.json` — despite the name, it tests nothing cross-company | — |
 
 ---
 
@@ -86,24 +86,22 @@ All curl examples below assume `http://127.0.0.1:2000` — adjust to whatever `e
 ```bash
 curl -s http://127.0.0.1:2000/eve/v1/review \
   -H 'content-type: application/json' \
-  -d @fixtures/valid.json
+  -d @fixtures/request.json
 ```
 
 **Expected:** `"decision": "approve"` citing acme MEAL-01 ($96 for 2 attendees = $48 each,
-under the $50 cap).
+under the $50 cap). ✅ Observed in baseline (2026-08-18).
 
 ### Use case B — Over-limit software should be flagged
 
 ```bash
 curl -s http://127.0.0.1:2000/eve/v1/review \
   -H 'content-type: application/json' \
-  -d @fixtures/request.json
+  -d @fixtures/ambiguous.json
 ```
 
 **Expected:** `"decision": "flag_for_review"` citing acme SW-01 ($450/month > $200/month).
-**Why this matters:** `evals/approve-valid.eval.ts` runs on this very fixture and asserts
-`approve` — so either the agent is wrong or the eval is wrong. Compare what you get here with
-what the eval suite claims (Use case G).
+✅ Observed in baseline (3 runs, consistent).
 
 ### Use case C — 🐛 Cross-tenant policy leak (stale memoized policy)
 
@@ -114,21 +112,24 @@ what the eval suite claims (Use case G).
 # 1st request: acme (this poisons the cache with acme's policy)
 curl -s http://127.0.0.1:2000/eve/v1/review \
   -H 'content-type: application/json' \
-  -d @fixtures/valid.json
+  -d @fixtures/request.json
 
-# 2nd request: initech meal, $40 for what looks like 2 people
+# 2nd request: initech meal ($40, Burgers x2 → ~2 attendees)
 curl -s http://127.0.0.1:2000/eve/v1/review \
   -H 'content-type: application/json' \
-  -d @fixtures/ambiguous.json
+  -d @fixtures/cross-company.json
 ```
 
-**What should happen:** the initech review is judged against initech rules (meals ≤
-$25/attendee → likely flag) and the response cites initech rule text.
+**What should happen:** the initech review is judged against initech rules and cites
+initech's MEAL-01 ($25 per attendee).
 
-**Bug symptom to look for:** the second response cites **acme's** limits (e.g. "$50 per
-attendee") or names "Acme Robotics" — initech's submission was judged against acme's policy.
-For a clean comparison, restart `eve dev` and send *only* the initech request first; note how
-the cited rule/limit differs.
+**Bug symptom to look for:** the second response cites **acme's** rule text instead. ✅
+Reproduced in baseline: the initech review came back citing "MEAL-01: Business meals
+reimbursed up to $50 per attendee with itemized receipt" — acme's rule, wrong tenant. The
+decision (`approve`) coincides either way, which is what makes the leak easy to miss.
+Deterministic proof without model calls: import `searchPolicy` from
+`agent/lib/policy-store.ts` in a `bun` script and call it for acme, then initech — every
+call after the first returns "Acme Robotics".
 
 ### Use case D — 🐛 Unknown company silently gets acme's policy
 
@@ -193,18 +194,15 @@ decision record that gets stored/displayed downstream is a PII leak.
 bunx eve eval
 ```
 
-Two evals exist, both on the default fixture (`fixtures/request.json`, the $450 software case):
+Two evals exist, both on the default fixture (`fixtures/request.json`, the within-policy
+$96 meal): `approve-valid.eval.ts` (asserts **approve** — a correct expectation) and
+`policy-citation.eval.ts` (an LLM judge checks the cited rule is concrete).
 
-- `approve-valid.eval.ts` — asserts the decision is **approve**. Per acme SW-01 the correct
-  decision is flag_for_review, so watch whether this eval *fails* (agent is right, eval is
-  wrong) or *passes* (agent approved something it shouldn't — worse).
-- `policy-citation.eval.ts` — an LLM judge checks the cited rule is concrete. Soft-scored.
-
-Also try pointing the suite at a fixture that matches the eval's description:
-
-```bash
-POC_REQUEST_FILE=fixtures/valid.json bunx eve eval
-```
+**🐛 Observed in baseline: the suite cannot run at all.** Both evals fail in ~130ms with
+`404 Cannot find any route matching [POST] .../eve/v1/session` — the eval harness drives the
+agent through eve's default session route, which the custom channel removed (same root cause
+as the startup-404 in Troubleshooting). No model call ever happens. Note `eve eval` also
+refuses to start while `eve dev` is running (single dev-server lock).
 
 ### Use case H — Observe cost per request
 
