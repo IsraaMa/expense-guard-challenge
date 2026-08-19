@@ -127,6 +127,16 @@ without the model ever seeing CASH-01. `selectRules` now always includes "genera
 unit-tested. Eval suite serialized (`maxConcurrency: 1`) after a concurrency-induced
 transport flake.
 
+### P3-11 — Receipt fence was escapable; line-item labels bypassed redaction — ✅ DONE
+
+Commit: "P3-11: close the two gaps around the receipt trust boundary". Found by auditing
+our own P3-9 defenses: a receipt containing the literal `</receipt_ocr>` closed the fence
+early, and line-item labels (submitter text too) were rendered raw — no PAN redaction, no
+trust boundary. `neutralizeFenceTags` strips submitter tag lookalikes before fencing;
+labels are now PAN-redacted and named in the instructions' trust boundary. Guarded by
+fence/label unit tests (`redact.test.ts`, `build-instructions.test.ts`) and the
+deterministic `evals/label-injection.eval.ts`.
+
 ### FINAL — Deliverables pass — ✅ DONE
 
 1. FINDINGS.md review: every commit has an entry; add the "deliberately not fixed" section
@@ -159,7 +169,9 @@ Read before extending the project — these are the boundaries of what the work 
    (tools cannot be steered to another tenant), but the decision still rests on the model
    honoring the `<receipt_ocr>` trust boundary; there is no runtime output filter beyond
    PAN redaction at source. Redaction is regex-based (no Luhn) and would miss a card number
-   split across OCR lines.
+   split across OCR lines. P3-11 closed the fence-escape and label-bypass gaps, which is
+   also a reminder that every submitter-controlled field added to the schema in the future
+   must be routed through the same redact-and-delimit path.
 4. **Exploit proven by construction, not observation.** For P0-3 the pre-fix model already
    resisted the sample injection; we demonstrated the vector, not a successful end-to-end
    exploit.

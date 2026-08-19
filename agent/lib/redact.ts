@@ -9,6 +9,15 @@
 // are never candidates.
 const CARD_NUMBER_CANDIDATE = /\d(?:[ -]?\d){12,18}/g;
 
+// The rendered prompt fences receipt text in <receipt_ocr> tags. A receipt that itself
+// contains such a tag would close the fence early and let the rest of the text read as
+// ordinary prompt — so any submitter-provided tag lookalike is stripped before fencing.
+const FENCE_TAG_LOOKALIKE = /<\s*\/?\s*receipt_ocr\s*>/gi;
+
+export function neutralizeFenceTags(text: string): string {
+  return text.replace(FENCE_TAG_LOOKALIKE, "[submitter tag removed]");
+}
+
 // Masks every digit except the last four, keeping the original grouping, so
 // "VISA 4111 1111 1111 1111" becomes "VISA **** **** **** 1111".
 export function redactCardNumbers(text: string): string {
