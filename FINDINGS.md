@@ -67,6 +67,43 @@ exists; was 404), `/eve/v1/review` still serves full reviews, and `bunx eve eval
 real: `Results: 2 passed (2 total)`, judge score 100%. The restored default routes use eve's
 default auth chain (`localDev` + Vercel OIDC), same as the scaffold default.
 
+## P0-1 / P0-2 — One company's expense policy could decide another company's expenses
+
+**What we found.** Two defects in `agent/lib/policy-store.ts`, both breaking tenant
+isolation:
+
+1. A module-level `activePolicy` cache (`if (activePolicy) return activePolicy`) was keyed
+   on nothing. The first company looked up in a server process won that cache permanently,
+   so every later review — for any company — was judged against the first company's policy.
+2. `POLICIES[companyId] ?? POLICIES.acme` silently handed Acme's policy to any unrecognized
+   `company_id`, so a typo or an unknown tenant leaked a real customer's rules.
+
+**How we confirmed it.** Deterministically, without spending a model call: importing
+`searchPolicy` in a bun script and calling it for `acme`, then `initech`, then `globex`
+returned "Acme Robotics" all three times; in a fresh process `searchPolicy("no-such-co")`
+also returned "Acme Robotics". End-to-end on the live server, an Initech meal submitted
+after an Acme review came back citing *Acme's* rule text ("up to $50 per attendee; itemized
+receipt required") instead of Initech's $25 rule. Note the decision (`approve`) was the same
+under either policy — the leak is invisible unless you read the citation, which is exactly
+why it survived.
+
+**What we changed and why.** Removed the cache entirely (a per-process cache of
+tenant-scoped data is the bug, not an optimization worth keeping — the lookup is an
+in-memory object read) and replaced the Acme fallback with a thrown error naming the unknown
+company. Failing a review is the correct outcome for an unconfigured tenant; approving it
+against someone else's rules is not. While in the file: dropped two unused exports, deleted
+the commented-out dead code, and replaced the index-loop string building with `filter` /
+`map` / `join`. `searchPolicy` now also returns the `company_id` it resolved, so the answer
+identifies which tenant it belongs to instead of being anonymous text.
+
+**Proof it holds.** `agent/lib/policy-store.test.ts` (`bun test`, 4 tests, ~65ms, no model
+calls): lookups return each company's own policy regardless of order, Initech's meal rule
+never contains Acme's `$50 per attendee`, an unknown company throws, and topic narrowing
+still falls back to the full policy. Verified as real regression coverage by restoring the
+original buggy implementation — 3 of the 4 tests fail — then restoring the fix (4 pass).
+Added `bun test` as the `test` script. Deterministic logic gets deterministic tests; the
+model-driven behavior is covered separately by the eval suite.
+
 ## Baseline (Step 1) — what we actually observed before fixing anything
 
 All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.

@@ -1,55 +1,45 @@
 // Loads and searches a company's expense policy for the search_policy tool.
+//
+// Tenant isolation rule: a lookup only ever returns the policy of the company that was
+// asked for. There is no cache between lookups and no default company to fall back on —
+// either the company has a configured policy or the lookup fails loudly.
 import { POLICIES, type tCompanyPolicy, type tPolicyRule } from "./policies.js";
 
-// Memoized so repeated policy lookups within a review are cheap.
-let activePolicy: tCompanyPolicy | null = null;
-
-export function getCompanyPolicy(companyId: string): tCompanyPolicy {
-  if (activePolicy) return activePolicy;
-  const resolved = POLICIES[companyId] ?? POLICIES.acme;
-  if (!resolved) throw new Error("No default expense policy is configured.");
-  activePolicy = resolved;
-  return resolved;
+function getCompanyPolicy(companyId: string): tCompanyPolicy {
+  const policy = POLICIES[companyId];
+  if (!policy) {
+    throw new Error(
+      `No expense policy is configured for company "${companyId}". Refusing to review this ` +
+        "submission against another company's policy.",
+    );
+  }
+  return policy;
 }
 
+// Rules whose category or text mentions the topic; falls back to the full policy so the
+// model never has to decide from an empty rule set.
 function selectRules(policy: tCompanyPolicy, topic: string | undefined): tPolicyRule[] {
   if (!topic) return policy.rules;
-  const q = topic.toLowerCase();
-  const hits: tPolicyRule[] = [];
-  for (let i = 0; i < policy.rules.length; i = i + 1) {
-    const r = policy.rules[i];
-    if (!r) continue;
-    if (r.category.toLowerCase().indexOf(q) >= 0) {
-      hits.push(r);
-      continue;
-    }
-    if (r.text.toLowerCase().indexOf(q) >= 0) {
-      hits.push(r);
-      continue;
-    }
-  }
-  // const hits2 = policy.rules.filter((x) => x.text.toLowerCase().includes(q));
-  // if (hits2.length > 0) return hits2;
-  if (hits.length === 0) return policy.rules;
-  return hits;
+  const needle = topic.toLowerCase();
+  const hits = policy.rules.filter(
+    (rule) =>
+      rule.category.toLowerCase().includes(needle) || rule.text.toLowerCase().includes(needle),
+  );
+  return hits.length > 0 ? hits : policy.rules;
+}
+
+function formatRules(rules: tPolicyRule[]): string {
+  return rules.map((rule) => `[${rule.id}] (${rule.category}) ${rule.text}`).join("\n");
 }
 
 export function searchPolicy(
   companyId: string,
   topic: string | undefined,
-): { company_name: string; rules: string } {
+): { company_id: string; company_name: string; rules: string } {
   const policy = getCompanyPolicy(companyId);
-  const rules = selectRules(policy, topic);
-  return { company_name: policy.company_name, rules: formatRules(rules) };
-}
-
-export function formatRules(rules: tPolicyRule[]): string {
-  let s = "";
-  for (let i = 0; i < rules.length; i = i + 1) {
-    const r = rules[i];
-    if (!r) continue;
-    s = s + "[" + r.id + "] (" + r.category + ") " + r.text;
-    if (i < rules.length - 1) s = s + "\n";
-  }
-  return s;
+  return {
+    company_id: policy.company_id,
+    company_name: policy.company_name,
+    rules: formatRules(selectRules(policy, topic)),
+  };
 }
