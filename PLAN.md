@@ -110,14 +110,12 @@ masks PANs before prompt build; the receipt is fenced in `<receipt_ocr>` tags wi
 boundary stated in the static instructions. Guarded by `redact.test.ts` (5 tests) and the
 deterministic `evals/pan-redaction.eval.ts`. The receipt-injection eval assertion was also
 hardened against false positives (details in FINDINGS.md).
-### P3-10 — Dead code / C-style noise sweep — ◐ MOSTLY DONE, final sweep TODO
 
-Already cleaned in their own commits: `policy-store.ts`, `validate_expense.ts`,
-`build-instructions.ts`. **Remaining spec:** `grep -rn "// const\|//   \|oldRender\|hits2"
-agent/ evals/` and read `agent/lib/request-context.ts` + `agent/channels/review.ts` once
-more; remove anything commented-out or unused that remains. If nothing is found, close the
-item in FINDINGS ("final sweep found nothing") without an empty commit. Do not reformat
-untouched files.
+### P3-10 — Dead code / C-style noise sweep — ✅ DONE
+
+Commit: "P3-10: final code-noise sweep". Per-file cleanups happened inside their fixes;
+the final sweep converted `policies.ts` to object literals and corrected a stale
+cache-savings comment in `review.ts`. Greps came back clean otherwise.
 
 ### FINAL — Deliverables pass — ⬜ TODO (last)
 

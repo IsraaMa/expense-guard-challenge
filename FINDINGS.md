@@ -257,6 +257,18 @@ decision resting on Initech's `$25` rule, and the phrase-form Acme limit absent 
 lesson already applied to tenant-isolation. Suite after: 6/6 evals, 12/12 gates, 14 unit
 tests.
 
+## P3-10 — Dead-code and style sweep (final pass)
+
+Most of the noise was removed inside the fixes that touched each file (policy-store,
+validate_expense, build-instructions — commented-out blocks, unused `tmp`/`_label`/
+`_status`, `2 - missing.length * 1`, C-style string building). The final sweep
+(`grep` for commented-out code plus a re-read of `request-context.ts` and the channels)
+caught two leftovers: `policies.ts` still built its data with mutate-and-push
+(`rules.push(...)` × 12, `POLICIES.acme = ...`) — now plain object literals, same data,
+verified by the policy-store tests — and a comment in `review.ts` claiming cross-request
+cache savings that P2-8's measurements disproved, now pointing at the honest FINDINGS
+numbers instead. Full checklist after: 6/6 evals, 12/12 gates, 14 unit tests.
+
 ## Baseline (Step 1) — what we actually observed before fixing anything
 
 All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.

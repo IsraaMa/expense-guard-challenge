@@ -72,8 +72,8 @@ export default defineChannel<tRequestView | undefined, { state: tRequestView | u
       }
 
       const view = buildRequestView(body);
-      // The submission rides as a user-role context message; the system prompt stays
-      // static so its prefix caches across requests.
+      // The submission rides as a user-role context message, keeping the system prompt
+      // identical across requests (see FINDINGS.md P2-8 for the measured cache behavior).
       const submission = resolveExpenseSubmission(view);
       const session = await send(
         {
