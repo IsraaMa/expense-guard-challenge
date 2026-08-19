@@ -179,6 +179,37 @@ travel threshold — only the itemization mismatch is wrong — and gates that i
 approved and that the reason surfaces both numbers. Suite after the change: 9 unit tests
 pass, 5/5 evals, 10/10 gates.
 
+## P2-8 — Volatile data lived in the system prompt (cost + posture), with an honest negative result
+
+**What we found.** `build-instructions.ts` rendered the submission (receipt, amounts, current
+timestamp) at the *top* of the system prompt, ahead of the static instructions. Any volatile
+content inside the system prompt prevents the provider from sharing a cached prompt prefix
+across requests, and it also puts untrusted OCR text into the most-trusted prompt role.
+
+**What we changed and why.** Followed eve's own guidance ("Instructions produce system
+messages only. Use channel `context` for user-role messages"): the instructions resolver now
+returns a fully static system prompt, and the submission + current date travel as a
+user-role context message attached by whichever channel accepted the request —
+`review.ts` adds it to its send payload, and a new `agent/channels/eve.ts` (built with
+`eveChannel()`, which *keeps* the default session routes — not the `defineChannel()`
+shadowing that caused BLOCKER-1) attaches the dev/eval fixture via `onMessage` for
+eval/playground sessions. `build-instructions.ts` was also rewritten from C-style string
+concatenation to a plain template literal, dropping the commented-out `oldRender` dead code
+(part of P3-10).
+
+**The honest measurement.** The predicted cross-request cache win did not materialize: with
+two sequential reviews on one server, the second request's first step still logs
+`cacheReadTokens: 0` — before *and* after the change. The cache-write sizes differ per
+request (1931 vs 1889 tokens), which shows eve places its cache breakpoint at the end of the
+message tail (for within-turn reuse, which works: later steps read ~1.9k cached tokens), not
+after the static prefix — so the cached span always includes the volatile message, and no
+app-level ordering can unlock cross-request reuse under eve 0.11's strategy. We kept the
+change anyway: it moves untrusted receipt text out of the system role (the substrate for
+P3-9), it is the framework-documented structure, and it is the precondition for prefix reuse
+if/when eve adds a static-prefix breakpoint. Cost impact today: neutral (measured, not
+assumed). Verified nothing regressed: 5/5 evals, 10/10 gates, 9 unit tests after the
+refactor.
+
 ## Baseline (Step 1) — what we actually observed before fixing anything
 
 All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.

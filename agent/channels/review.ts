@@ -7,8 +7,13 @@
 // clients depend on. As `review.ts` this channel adds its route alongside the defaults.
 import { z } from "zod";
 import { defineChannel, POST, type Session, type SendPayload } from "eve/channels";
+import { renderSubmissionContext } from "../lib/build-instructions.js";
 import { ExpenseDecisionSchema } from "../lib/expense.schema.js";
-import { buildRequestView, type tRequestView } from "../lib/request-context.js";
+import {
+  buildRequestView,
+  resolveExpenseSubmission,
+  type tRequestView,
+} from "../lib/request-context.js";
 
 type tJsonOutputSchema = NonNullable<SendPayload["outputSchema"]>;
 
@@ -67,8 +72,15 @@ export default defineChannel<tRequestView | undefined, { state: tRequestView | u
       }
 
       const view = buildRequestView(body);
+      // The submission rides as a user-role context message; the system prompt stays
+      // static so its prefix caches across requests.
+      const submission = resolveExpenseSubmission(view);
       const session = await send(
-        { message: "Review the expense submission and return your decision.", outputSchema },
+        {
+          message: "Review the expense submission and return your decision.",
+          context: [renderSubmissionContext(submission, new Date())],
+          outputSchema,
+        },
         { auth: null, continuationToken: `eve:${crypto.randomUUID()}`, state: view },
       );
 
