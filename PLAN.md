@@ -14,6 +14,12 @@ code and the ordered plan to fix them.
   change can be traced back to its diagnosis. Commit messages name the finding they resolve
   (e.g. `P0-1: remove cross-tenant policy memoization`).
 - No drive-by changes inside a commit that belong to a different finding.
+- **Commit descriptions are written at business level.** The subject keeps the finding id for
+  traceability, but the body leads with impact — who was affected and how — and includes a
+  concrete example, not implementation mechanics (those live in FINDINGS.md and the diff).
+  Say "a submission from one company could be judged under another company's expense policy
+  (an Initech meal was approved citing Acme's $50 limit)" rather than "remove module-level
+  memoization in policy-store.ts".
 
 ## Problems identified (by severity)
 
