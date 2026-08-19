@@ -37,11 +37,12 @@ in the project can even be assessed until this is fixed.
   id the window resolves from the catalog.
 - `evals/evals.config.ts`: judge → `anthropic/claude-haiku-4.5` (the catalog spelling).
 
-**Verification status.** Build passes and the "model not found" failure is gone. Full
-end-to-end verification (a complete review turn + the eval suite) is currently blocked by the
-Gateway account tier — the API key's team shows as free tier despite a credit top-up, which
-gates all Claude 4+ models and rate-limits the free ones below what an agent turn needs. To
-be re-run as the first act of Step 1 (baseline) once the account is sorted.
+**Verification status.** Verified end-to-end. After the fix (and after resolving a Gateway
+account-tier issue on our side — the key's team needed paid credits), `POST /eve/v1/review`
+with `fixtures/valid.json` completed a full agent turn on `claude-sonnet-4.5` and returned a
+correct structured decision: `approve`, citing `[MEAL-01] $50 per attendee limit` at
+$48/attendee. The eval suite was deliberately not run yet — proving the project runs only
+needs one review turn; evals come with the baseline pass (Step 1).
 
 ## Noticed but deliberately not fixed (running list)
 
