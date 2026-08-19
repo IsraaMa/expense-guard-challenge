@@ -226,9 +226,69 @@ bug made visible.
 
 | Symptom | Fix |
 |---|---|
-| Startup logs `404 … Cannot find any route matching [POST] /eve/v1/session` | Expected — eve's built-in dev playground tries to open a chat session on the framework's default route, but this project's custom channel (`agent/channels/eve.ts`) replaces it and only serves `POST /eve/v1/review`. The server still works; use curl as below. |
+| Startup logs `404 … Cannot find any route matching [POST] /eve/v1/session` | Only on the pre-fix baseline (`393baee`) — the original custom channel replaced eve's default session routes. Fixed in BLOCKER-1; on the current branch the session routes and `POST /eve/v1/review` coexist. |
+| `eve eval` prints "A dev server is already running" | Only one server per repo. Stop it first: `PID=$(lsof -nP -tiTCP:2000 -sTCP:LISTEN); [ -n "$PID" ] && kill $PID` |
 | `eve dev` errors about a missing model / auth | `AI_GATEWAY_API_KEY` missing or lacks access to the `anthropic/*` models — check `.env`. |
 | Startup hangs on macOS | Should not happen (`agent/sandbox.ts` pins `justbash`); if it does, verify that file is intact. |
 | `{"ok":false,"error":"Invalid JSON body."}` | Your curl body isn't valid JSON — check quoting; `-d @fixtures/x.json` is the safest form. |
 | Responses seem to ignore your POST body | An empty/non-object body falls back to the fixture file — confirm you sent a non-empty JSON object. |
 | Use cases C/D give confusing results | The policy cache persists per process — **restart `eve dev`** between isolation experiments. |
+
+---
+
+## 7. Manual testing — running the test suites yourself
+
+All results (per-test/per-gate detail) print directly in the terminal.
+
+### Unit tests (deterministic, free, ~100 ms)
+
+```bash
+bun test                                   # all 21 tests across agent/lib/*.test.ts
+bun test agent/lib/redact.test.ts          # one file (policy-store, validate-submission,
+                                           # redact, build-instructions)
+```
+
+Prints one line per test (✓/✗ with the test name) and a pass/fail summary. A failure shows
+the expected-vs-received diff inline.
+
+### Eval suite (live model calls — needs AI_GATEWAY_API_KEY, costs a few cents)
+
+Stop any running dev server first (`eve eval` boots its own):
+
+```bash
+PID=$(lsof -nP -tiTCP:2000 -sTCP:LISTEN); [ -n "$PID" ] && kill $PID
+
+bunx eve eval                              # full suite: 13 evals / 20 gates, serialized
+bunx eve eval tenant-isolation             # one eval by id (file name without .eval.ts)
+bunx eve eval policy-coverage              # all 6 dataset cases (ids policy-coverage/0000..0005)
+bunx eve eval policy-coverage/0001         # a single dataset case
+```
+
+Terminal output per eval: ✓/✗, gates passed (`gates 4/4`), judge scores where used, and a
+`Results: N passed (N total)` summary. Per-step token usage is logged by
+`agent/hooks/usage-log.ts` as the runs execute.
+
+### Seeing the full decision detail
+
+Most evals `t.log(...)` the complete decision JSON they received. Add `--verbose` to stream
+those lines:
+
+```bash
+bunx eve eval receipt-injection --verbose   # prints the agent's actual decision JSON
+bunx eve eval --json                        # machine-readable results (CI-friendly)
+```
+
+A failed gate names the assertion that missed (e.g. "expected the decision to cite
+CASH-01"); pair it with the `--verbose` decision log to see exactly what the agent said.
+
+### What each eval proves
+
+| Eval id | Proves |
+|---|---|
+| `approve-valid`, `policy-citation` | Happy path approves and cites a real rule (fixture-driven). |
+| `tenant-isolation` | Sequential reviews for different companies each get their own policy; unknown companies borrow nothing. |
+| `receipt-injection` | A hostile receipt can't redirect the review to another company's rules. |
+| `label-injection` | A card number / instruction planted in a line-item label never reaches the decision. |
+| `pan-redaction` | A full card number on a receipt never appears in the response. |
+| `unsupported-amount` | A claim the itemization doesn't support is flagged, not approved. |
+| `policy-coverage/0000–0005` | Every written policy rule (alcohol, cash-only, entertainment, meal caps, flights, office) drives the decision it prescribes. |
