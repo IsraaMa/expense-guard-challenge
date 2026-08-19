@@ -1,6 +1,10 @@
 // HTTP channel: POST /eve/v1/review runs one structured review turn and returns the
 // decision. Per-request context flows body -> channel state -> metadata(state) ->
 // instructions resolver (ctx.channel.metadata). A bare body falls back to the fixture.
+//
+// Deliberately NOT named `eve.ts`: that file stem overrides eve's default HTTP channel
+// and removes the /eve/v1/session* routes that `eve eval`, the dev playground, and SDK
+// clients depend on. As `review.ts` this channel adds its route alongside the defaults.
 import { z } from "zod";
 import { defineChannel, POST, type Session, type SendPayload } from "eve/channels";
 import { ExpenseDecisionSchema } from "../lib/expense.schema.js";

@@ -44,6 +44,29 @@ correct structured decision: `approve`, citing `[MEAL-01] $50 per attendee limit
 $48/attendee. The eval suite was deliberately not run yet — proving the project runs only
 needs one review turn; evals come with the baseline pass (Step 1).
 
+## BLOCKER-1 — Authored channel shadowed eve's default channel, killing the eval suite
+
+**What we found.** `agent/channels/eve.ts` used the reserved `eve` file stem, which
+*replaces* the framework's default HTTP channel instead of adding to it. The default channel
+carries the `/eve/v1/session*` routes that `eve eval`, the `eve dev` playground, and SDK
+clients all drive the agent through. With it gone, every eval failed instantly with
+`404 Cannot find any route matching [POST] .../eve/v1/session` — before any model call — so
+the repo's "evals as executable specs" could never have run. The dev playground failed with
+the same 404 at startup.
+
+**How we confirmed it.** Baseline `bunx eve eval`: `Results: 2 failed (2 total)` in 128ms,
+both with the session-route 404. Eve's own docs (`docs/channels/eve.mdx`): the default
+session routes "are enabled by default even when `agent/channels/eve.ts` does not exist" —
+that file exists only to *override* them; and the channel file stem is the channel id.
+
+**What we changed and why.** Renamed `agent/channels/eve.ts` → `agent/channels/review.ts`
+(content unchanged apart from a comment documenting the naming constraint). As `review`, the
+channel adds `POST /eve/v1/review` alongside the restored default routes instead of replacing
+them. Verified after the change: `POST /eve/v1/session` answers 400 on a bad body (route
+exists; was 404), `/eve/v1/review` still serves full reviews, and `bunx eve eval` runs for
+real: `Results: 2 passed (2 total)`, judge score 100%. The restored default routes use eve's
+default auth chain (`localDev` + Vercel OIDC), same as the scaffold default.
+
 ## Baseline (Step 1) — what we actually observed before fixing anything
 
 All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.
