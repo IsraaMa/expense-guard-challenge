@@ -77,21 +77,11 @@ POST real submissions through `evals/review-endpoint.ts` (shared helper).
 `fixtures/request.json` is a within-policy $96 meal; the eval is correct. The suspicion
 came from misreading `cat fixtures/*.json` output (alphabetical order). Kept for honesty.
 
-### P1-5 — `request.json` and `valid.json` are byte-identical duplicates — ⬜ TODO
+### P1-5 — `request.json` and `valid.json` were byte-identical duplicates — ✅ DONE
 
-Two identical fixtures under different names invite exactly the misattribution behind the
-P1-4 retraction.
-
-**Spec:**
-1. Delete `fixtures/valid.json` (`git rm`). `request.json` stays — it is the
-   `POC_REQUEST_FILE` default (`agent/lib/request-context.ts:33`).
-2. `grep -rn "valid.json" .` (excluding node_modules, .git) and update every reference —
-   expected hits: `QUICKSTART.md` (fixture table + possibly use cases), `.env.example`
-   comment if present. Evals do not reference it.
-3. Verify with checklist; note evals need no change (they use `request.json` by default and
-   POST inline submissions otherwise).
-4. FINDINGS entry + commit (business-level: duplicate sample data caused a real
-   misdiagnosis during this project — cite the P1-4 retraction as the impact).
+Commit: "P1-5: remove the duplicate sample fixture that caused a real misdiagnosis".
+`fixtures/valid.json` deleted; `request.json` (the `POC_REQUEST_FILE` default) stays;
+QUICKSTART references updated. Evals unaffected.
 
 ### P1-6 — validate_expense validated nothing — ✅ DONE
 

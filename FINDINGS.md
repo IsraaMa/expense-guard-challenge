@@ -210,6 +210,19 @@ if/when eve adds a static-prefix breakpoint. Cost impact today: neutral (measure
 assumed). Verified nothing regressed: 5/5 evals, 10/10 gates, 9 unit tests after the
 refactor.
 
+## P1-5 — Two byte-identical fixtures under different names
+
+**What we found.** `fixtures/valid.json` was a byte-for-byte copy of `fixtures/request.json`
+(`cmp` exits clean). Identical sample data under two names is not hypothetical confusion: it
+directly caused the P1-4 misdiagnosis in this very project — contents were attributed to the
+wrong filenames and a correct eval was suspected of asserting the wrong outcome, costing a
+full debugging detour.
+
+**What we changed and why.** Deleted `valid.json`; `request.json` stays because it is the
+documented `POC_REQUEST_FILE` default. Updated the two QUICKSTART references. No eval or
+agent code referenced the deleted file, so behavior is unchanged — verified by the full
+checklist (typecheck, unit tests, build, eval suite).
+
 ## Baseline (Step 1) — what we actually observed before fixing anything
 
 All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.
