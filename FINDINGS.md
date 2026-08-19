@@ -302,6 +302,30 @@ All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.
   in `reason`, but nothing prevents it (the rubric explicitly asks to quote receipt details).
   Still queued as hardening (P3-9).
 
-## Noticed but deliberately not fixed (running list)
+## Noticed but deliberately not fixed
 
-- Nothing deliberately skipped yet — see `PLAN.md` for the full backlog being worked in order.
+- **Cross-request prompt caching (eve's cache breakpoint).** Even with a fully static
+  system prompt, cross-request `cacheReadTokens` is 0 because eve 0.11 places its cache
+  breakpoint at the message tail (measured in P2-8). Unlocking it requires a framework
+  change (a breakpoint after the static prefix), not app code. We restructured the prompt
+  so the win is available the day eve supports it, documented the numbers, and stopped.
+- **No auth on `POST /eve/v1/review` (`auth: null`).** Fine for this exercise's local
+  scope, not for production — any caller could submit reviews for any company_id, which
+  would make the tenant-isolation work moot at the HTTP layer. A deployment needs route
+  auth (eve's `routeAuth` chain, as the default channel already does) plus a check that the
+  authenticated principal may submit for that company. Out of scope: it's a deployment
+  concern with real design choices (identity provider, tenant-to-principal mapping) that
+  the challenge repo gives no basis to decide.
+- **Currency is echoed, never validated or converted.** A submission may claim EUR against
+  policies written in USD; the schema passes the currency through untouched. Correct
+  handling needs a product decision (reject non-policy currencies? convert at what rate?)
+  — flagged rather than guessed.
+- **Attendee count is inferred from receipt text.** Rules are per-attendee, but the count
+  comes from the model reading hints like "Burgers x2" / "Table of 2". The real fix is an
+  `attendees` field in the submission contract — an API change for the platform team, not
+  something to invent unilaterally here.
+- **`illegible.json` has no dedicated eval.** Baseline showed the illegible-receipt case
+  already behaves correctly (flag_for_review with the mismatch explained), and the
+  unsupported-amount eval covers the load-bearing half deterministically. A judge-scored
+  legibility eval would add cost per run for a behavior already pinned indirectly —
+  deprioritized inside the timebox.

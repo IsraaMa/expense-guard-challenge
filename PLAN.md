@@ -117,7 +117,7 @@ Commit: "P3-10: final code-noise sweep". Per-file cleanups happened inside their
 the final sweep converted `policies.ts` to object literals and corrected a stale
 cache-savings comment in `review.ts`. Greps came back clean otherwise.
 
-### FINAL — Deliverables pass — ⬜ TODO (last)
+### FINAL — Deliverables pass — ✅ DONE
 
 1. FINDINGS.md review: every commit has an entry; add the "deliberately not fixed" section
    with at least: (a) eve's message-tail cache breakpoint (upstream framework behavior;

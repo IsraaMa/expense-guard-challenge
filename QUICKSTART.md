@@ -1,7 +1,11 @@
 # Expense Guard — Local Quick Start & Assessment Guide
 
-A from-scratch guide to run this project locally and poke at its current behavior — including
-explicit use cases that exercise the features and the suspected bugs (see `PLAN.md`).
+A from-scratch guide to run this project locally and poke at its behavior.
+
+> **Status note:** this guide was written during the pre-fix baseline, and its use cases
+> double as reproduction recipes for the bugs that have since been FIXED on this branch
+> (see `FINDINGS.md`). The "bug symptom" callouts describe the original behavior at commit
+> `393baee`; on the current branch every use case shows the correct behavior.
 
 ---
 
@@ -10,7 +14,7 @@ explicit use cases that exercise the features and the suspected bugs (see `PLAN.
 | Requirement | Why | Install |
 |---|---|---|
 | **Bun** (runtime + package manager) | The project is built and run with Bun. | `curl -fsSL https://bun.sh/install \| bash` then restart your terminal. Verify: `bun --version` |
-| **A Vercel AI Gateway API key** | The agent calls Anthropic models through the Vercel AI Gateway (`anthropic/*` model ids). | Create one at https://vercel.com/dashboard → AI Gateway → API Keys. The key must be able to reach `anthropic/claude-opus-4-1-20250805` (agent) and `anthropic/claude-haiku-4-5` (eval judge). |
+| **A Vercel AI Gateway API key** | The agent calls Anthropic models through the Vercel AI Gateway (`anthropic/*` model ids). | Create one at https://vercel.com/dashboard → AI Gateway → API Keys, on a **paid-tier team** (free tier can't run an agent turn). Models used: `anthropic/claude-sonnet-4.5` (agent) and `anthropic/claude-haiku-4.5` (eval judge). |
 | **curl** (or any HTTP client) | To POST submissions to the local server. | Preinstalled on macOS. |
 
 macOS note: the sandbox backend is already pinned to `justbash` in `agent/sandbox.ts` — you do
@@ -38,8 +42,9 @@ bunx eve build     # compiles the agent; should finish without errors
 | `bunx eve eval` | Runs the eval suite in `evals/*.eval.ts` against the agent. |
 | `POC_REQUEST_FILE=fixtures/<name>.json bunx eve dev` (or `eval`) | Overrides which fixture is used when a request has **no body** (and for evals). Default is `fixtures/request.json`. |
 
-How a request flows: `POST` body → channel (`agent/channels/eve.ts`) → system prompt is built
-with the submission embedded (`agent/lib/build-instructions.ts`) → the model calls the
+How a request flows: `POST` body → review channel (`agent/channels/review.ts`) → the static
+system prompt plus the submission as a user-role context message (PAN-redacted receipt fenced
+in `<receipt_ocr>` tags, `agent/lib/build-instructions.ts`) → the model calls the
 `search_policy` and `validate_expense` tools → returns a structured decision:
 
 ```json
@@ -197,11 +202,11 @@ Two evals exist, both on the default fixture (`fixtures/request.json`, the withi
 $96 meal): `approve-valid.eval.ts` (asserts **approve** — a correct expectation) and
 `policy-citation.eval.ts` (an LLM judge checks the cited rule is concrete).
 
-**🐛 Observed in baseline: the suite cannot run at all.** Both evals fail in ~130ms with
-`404 Cannot find any route matching [POST] .../eve/v1/session` — the eval harness drives the
-agent through eve's default session route, which the custom channel removed (same root cause
-as the startup-404 in Troubleshooting). No model call ever happens. Note `eve eval` also
-refuses to start while `eve dev` is running (single dev-server lock).
+**Historical bug (fixed in BLOCKER-1):** at baseline the suite could not run at all — both
+evals 404'd on `/eve/v1/session` because the custom channel had replaced eve's default
+channel. On the current branch the full suite runs and passes (6 evals / 12 gates,
+including tenant isolation, receipt injection, PAN redaction, and unsupported-amount).
+Note `eve eval` refuses to start while `eve dev` is running (single dev-server lock).
 
 ### Use case H — Observe cost per request
 
