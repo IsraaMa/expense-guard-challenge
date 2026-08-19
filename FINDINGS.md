@@ -145,6 +145,40 @@ flagged it — so the leak signal was narrowed to the phrase form of a per-atten
 Final state: 4/4 evals pass, 9/9 gates (approve-valid, policy-citation, tenant-isolation,
 receipt-injection). Also added `@types/bun` so `tsc --noEmit` runs clean over the test file.
 
+## P1-6 — validate_expense validated nothing
+
+**What we found.** The tool's entire output was "are company_id / category / claimed_amount
+present" — facts its own Zod input schema already guaranteed before `execute` ran, so it
+could never report anything but `valid: true` for any call the runtime allowed. Meanwhile
+the system prompt told the *model* to "double-check that the receipt totals add up", i.e.
+delegated the one check that matters — does the itemization support the claimed amount — to
+LLM arithmetic in prose. The implementation was also noise: an unused `tmp` string built in
+parallel with the real list, `_label` / `_status` fields computed and then dropped before
+return, a commented-out "too large" check, and `2 - missing.length * 1`.
+
+**How we confirmed it.** Read of the code path (schema-guaranteed inputs re-checked, nothing
+else examined) plus the baseline `illegible.json` run: $1,280 claimed with only $45 itemized
+— the tool would have called that valid; the right decision came from the model noticing the
+mismatch itself, which is luck, not design.
+
+**What we changed and why.** The checks now live in a pure function
+(`agent/lib/validate-submission.ts`): required fields, positive amount, and line-items-sum
+vs claimed amount with cent-level float tolerance; findings come back as human-readable
+`issues` the model can cite. The tool takes **no arguments** and reads the submission from
+`submissionState`, same principle as P0-3 — the model can't validate different numbers than
+were actually submitted. The prompt step now tells the model to use the tool for that
+arithmetic and that an unsupported amount means flag-for-review, not approval. Submissions
+without line items are not penalized: absence of itemization is a judgment call for the
+model/policy, not a deterministic failure.
+
+**Proof it holds.** 5 unit tests (`validate-submission.test.ts`) covering the consistent
+case, the inflated-claim case ($1,280 vs $45 itemized — the fixture scenario), cent rounding,
+the no-line-items case, and missing/non-positive fields. End-to-end,
+`evals/unsupported-amount.eval.ts` submits a claim whose amount alone would pass Globex's
+travel threshold — only the itemization mismatch is wrong — and gates that it is not
+approved and that the reason surfaces both numbers. Suite after the change: 9 unit tests
+pass, 5/5 evals, 10/10 gates.
+
 ## Baseline (Step 1) — what we actually observed before fixing anything
 
 All live runs on `claude-sonnet-4.5` via `POST /eve/v1/review`, 2026-08-18.

@@ -17,8 +17,10 @@ function steps() {
   x = x + "   review (it is resolved from the submission automatically). Never rely on policy you\n";
   x = x + "   remember from another company — each company sets its own limits.\n";
   x = x + "2. Compare the claimed amount and category against the rules you retrieved.\n";
-  x = x + "3. Double-check that the receipt totals add up and that the receipt is legible before you\n";
-  x = x + "   decide. You may call validate_expense to sanity-check the submission's fields.\n";
+  x = x + "3. Call validate_expense to run the deterministic checks (required fields, and that the\n";
+  x = x + "   line items add up to the claimed amount) instead of doing that arithmetic yourself,\n";
+  x = x + "   and confirm the receipt is legible before you decide. An amount the itemization does\n";
+  x = x + "   not support is a reason to flag for human review, not to approve.\n";
   return x;
 }
 
