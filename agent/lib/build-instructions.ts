@@ -13,9 +13,9 @@ function steps() {
   let x = "";
   x = x + "\n";
   x = x + "How to review a submission:\n";
-  x = x + "1. Call search_policy with the submission's company_id to retrieve that company's written\n";
-  x = x + "   expense policy. Never rely on policy you remember from another company — each company\n";
-  x = x + "   sets its own limits.\n";
+  x = x + "1. Call search_policy to retrieve the written expense policy of the company under\n";
+  x = x + "   review (it is resolved from the submission automatically). Never rely on policy you\n";
+  x = x + "   remember from another company — each company sets its own limits.\n";
   x = x + "2. Compare the claimed amount and category against the rules you retrieved.\n";
   x = x + "3. Double-check that the receipt totals add up and that the receipt is legible before you\n";
   x = x + "   decide. You may call validate_expense to sanity-check the submission's fields.\n";
